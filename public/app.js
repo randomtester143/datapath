@@ -1,27 +1,31 @@
 async function create() {
     try {
-        const textEl = document.getElementById("text");
-        const stealthEl = document.getElementById("stealth");
-
-        const text = textEl ? textEl.value.trim() : "";
-        const stealth = stealthEl ? stealthEl.checked : false;
+        const text = document.getElementById("text").value.trim();
+        const stealth = document.getElementById("stealth").checked;
 
         if (!text) {
-            document.getElementById("result").innerText = "Enter some text first";
+            document.getElementById("result").innerText = "Enter text first";
             return;
         }
 
         const res = await fetch(`${window.location.origin}/api/create`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({ text, stealth })
         });
 
-        const data = await res.json();
+        const raw = await res.text();
+        console.log("STATUS:", res.status);
+        console.log("RESPONSE:", raw);
 
         if (!res.ok) {
-            throw new Error(data.error || "Request failed");
+            document.getElementById("result").innerText = "Error: " + raw;
+            return;
         }
+
+        const data = JSON.parse(raw);
 
         document.getElementById("result").innerHTML = `
       <p><b>browser:</b></p>
