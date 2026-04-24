@@ -1,0 +1,16 @@
+{
+  "routes": [
+    {
+      "src": "/api/create",
+      "dest": "/api/create.js"
+    },
+    {
+      "src": "/raw/(.*)",
+      "dest": "/api/raw/[id].js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/view/[id].js"
+    }
+  ]
+}
