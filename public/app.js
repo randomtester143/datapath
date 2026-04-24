@@ -11,11 +11,9 @@ async function create() {
             return;
         }
 
-        const res = await fetch("/api/create", {
+        const res = await fetch(`${window.location.origin}/api/create`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text, stealth })
         });
 
