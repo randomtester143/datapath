@@ -5,20 +5,16 @@ export default async function handler(req, res) {
 
     const data = await redis.get(id);
 
-    if (!data) {
-        return res.status(404).send("Expired or invalid");
-    }
+    if (!data) return res.status(404).send("Expired or invalid");
 
     await redis.del(id);
 
-    const parsed = JSON.parse(data);
-
-    if (parsed.stealth) {
+    if (data.stealth) {
         return res.send(`
       <html>
         <body style="margin:0;">
           <script>
-            const text = ${JSON.stringify(parsed.text)};
+            const text = ${JSON.stringify(data.text)};
             document.addEventListener("click", async () => {
               await navigator.clipboard.writeText(text);
               document.body.innerHTML = "Copied";
@@ -29,5 +25,5 @@ export default async function handler(req, res) {
     `);
     }
 
-    res.send(`<pre>${parsed.text}</pre>`);
+    res.send(`<pre>${data.text}</pre>`);
 }

@@ -5,14 +5,10 @@ export default async function handler(req, res) {
 
     const data = await redis.get(id);
 
-    if (!data) {
-        return res.status(404).send("Expired or invalid");
-    }
+    if (!data) return res.status(404).send("Expired or invalid");
 
     await redis.del(id);
 
-    const parsed = JSON.parse(data);
-
     res.setHeader("Content-Type", "text/plain");
-    res.send(parsed.text);
+    res.send(data.text);
 }

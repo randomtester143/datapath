@@ -1,6 +1,6 @@
 {
   "name": "datapath",
   "dependencies": {
-    "ioredis": "^5.10.1"
+    "@upstash/redis": "^1.37.0"
   }
 }
