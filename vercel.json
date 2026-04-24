@@ -9,6 +9,10 @@
       "dest": "/api/raw/[id].js"
     },
     {
+      "src": "^/$",
+      "dest": "/public/index.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/view/[id].js"
     }
