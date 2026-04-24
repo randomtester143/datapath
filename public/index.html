@@ -49,6 +49,20 @@
             font-family: monospace;
         }
 
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
         .controls {
             display: flex;
             justify-content: space-between;
@@ -104,6 +118,7 @@
             font-family: monospace;
             font-size: 0.8rem;
             background: var(--bg);
+            color: var(--text);
         }
 
         .input-row button {
@@ -116,7 +131,12 @@
 <body>
     <div class="container">
         <h1>Datapath</h1>
-        <textarea id="text" placeholder="Paste sensitive data here. Data encrypts locally in your browser."></textarea>
+        <textarea id="text" placeholder="Paste sensitive data here."></textarea>
+
+        <div class="input-group">
+            <input type="password" id="key" placeholder="Access Key (Required)">
+            <input type="text" id="customId" placeholder="Custom ID (Max 5)" maxlength="5">
+        </div>
 
         <div class="controls">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
@@ -125,18 +145,18 @@
             </label>
         </div>
 
-        <button id="shareBtn">Encrypt & Share</button>
+        <button id="shareBtn">Protect & Share</button>
 
         <div id="links" class="links">
             <div class="link-group">
-                <label>Browser Link (Auto-decrypts)</label>
+                <label>Browser Link</label>
                 <div class="input-row">
                     <input type="text" id="browserLink" readonly>
                     <button onclick="copyToClipboard('browserLink')">Copy</button>
                 </div>
             </div>
             <div class="link-group">
-                <label>Raw API Link (Ciphertext)</label>
+                <label>Terminal / API Endpoint</label>
                 <div class="input-row">
                     <input type="text" id="rawLink" readonly>
                     <button onclick="copyToClipboard('rawLink')">Copy</button>

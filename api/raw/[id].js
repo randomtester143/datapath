@@ -1,25 +1,34 @@
 import { redis } from '../../lib/redis.js';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
     const { id } = req.query;
-    if (!id) return res.status(400).json({ error: 'Bad Request' });
+    if (!id) return res.status(400).send('Bad Request\n');
 
-    // Atomically retrieve and delete
-    const pipeline = redis.pipeline();
-    pipeline.get(id);
-    pipeline.del(id);
-    const results = await pipeline.exec();
-    const data = results[0];
+    const key = req.query.key || req.headers['x-key'];
+
+    // Fetch payload (do not delete yet to prevent unauthenticated data destruction)
+    const data = await redis.get(id);
 
     if (!data) {
-        return res.status(404).json({ error: 'Not Found or Already Read' });
+        return res.status(404).send('Not Found or Already Read\n');
     }
 
-    // Returns raw ciphertext because the server lacks the key to decrypt
-    res.status(200).json({
-        notice: "Zero-knowledge enforcement: Server cannot decrypt. Decrypt this ciphertext locally using the key from the URL hash.",
-        ciphertext: data.ciphertext,
-        iv: data.iv,
-        stealth: data.stealth
-    });
+    // Handle missing key
+    if (!key) {
+        return res.status(401).send('Enter key:\n');
+    }
+
+    // Validate key
+    const providedHash = crypto.createHash('sha256').update(key).digest('hex');
+
+    if (providedHash !== data.keyHash) {
+        return res.status(403).send('Invalid key\n');
+    }
+
+    // Key is correct: execute read-once destruction
+    await redis.del(id);
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(200).send(data.text + '\n');
 }
