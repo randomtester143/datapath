@@ -2,7 +2,7 @@ import redis from "../../lib/redis.js";
 
 export default async function handler(req, res) {
     try {
-        const { id } = req.query;
+        const id = req.query.id || req.url.split("/").pop();
 
         if (!id) {
             return res.status(400).send("Invalid ID");
@@ -15,26 +15,6 @@ export default async function handler(req, res) {
         }
 
         await redis.del(id);
-
-        if (data.stealth) {
-            return res.send(`
-        <html>
-          <body style="margin:0;">
-            <script>
-              const text = ${JSON.stringify(data.text)};
-              document.addEventListener("click", async () => {
-                try {
-                  await navigator.clipboard.writeText(text);
-                  document.body.innerHTML = "Copied";
-                } catch {
-                  document.body.innerHTML = "<pre>"+text+"</pre>";
-                }
-              });
-            </script>
-          </body>
-        </html>
-      `);
-        }
 
         res.send(`<pre>${data.text}</pre>`);
 
