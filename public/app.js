@@ -16,24 +16,21 @@ async function create() {
             body: JSON.stringify({ text, stealth })
         });
 
-        const raw = await res.text();
-        console.log("STATUS:", res.status);
-        console.log("RESPONSE:", raw);
+        const data = await res.json();
 
         if (!res.ok) {
-            document.getElementById("result").innerText = "Error: " + raw;
+            document.getElementById("result").innerText = data.error || "Error";
             return;
         }
 
-        const data = JSON.parse(raw);
-
         document.getElementById("result").innerHTML = `
-      <p><b>browser:</b></p>
+      <p><b>Browser link:</b></p>
       <a href="${data.link}" target="_blank">${data.link}</a>
 
-      <p><b>terminal:</b></p>
+      <p><b>Terminal link:</b></p>
       <code>${data.raw}</code>
     `;
+
     } catch (err) {
         console.error(err);
         document.getElementById("result").innerText = "Error: " + err.message;
