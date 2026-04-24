@@ -1,24 +1,20 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/$",
-      "dest": "/public/index.html"
+      "source": "/raw/:id",
+      "destination": "/api/raw/:id"
     },
     {
-      "src": "/app.js",
-      "dest": "/public/app.js"
+      "source": "/app.js",
+      "destination": "/app.js"
     },
     {
-      "src": "/api/create",
-      "dest": "/api/create.js"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     },
     {
-      "src": "/raw/(.*)",
-      "dest": "/api/raw/[id].js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/view/[id].js"
+      "source": "/:id",
+      "destination": "/api/view/:id"
     }
   ]
 }

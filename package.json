@@ -1,7 +1,8 @@
 {
   "name": "datapath",
+  "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "@upstash/redis": "^1.37.0"
+    "@upstash/redis": "^1.28.4"
   }
 }

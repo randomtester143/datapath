@@ -1,37 +1,23 @@
-import redis from "../lib/redis.js";
-import crypto from "crypto";
+import { redis } from '../lib/redis.js';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
-    if (req.method !== "POST") {
-        return res.status(405).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+
+    try {
+        const { ciphertext, iv, stealth } = req.body;
+        if (!ciphertext || !iv) return res.status(400).json({ error: 'Missing encryption payload' });
+
+        const id = crypto.randomBytes(6).toString('hex');
+        const ttl = stealth ? 300 : 3600; // 5 minutes or 1 hour
+
+        const payload = JSON.stringify({ ciphertext, iv, stealth });
+        const success = await redis.set(id, payload, { nx: true, ex: ttl });
+
+        if (!success) throw new Error('Collision or Redis failure');
+
+        res.status(200).json({ id });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    let body = req.body;
-
-    if (typeof body === "string") {
-        try {
-            body = JSON.parse(body);
-        } catch {
-            return res.status(400).json({ error: "Invalid JSON" });
-        }
-    }
-
-    const { text, stealth } = body || {};
-
-    if (!text) {
-        return res.status(400).json({ error: "No text" });
-    }
-
-    if (text.length > 50000) {
-        return res.status(400).json({ error: "Too large" });
-    }
-
-    const id = crypto.randomBytes(4).toString("hex");
-
-    await redis.set(id, { text, stealth }, { ex: 300 }); // 5 min
-
-    res.json({
-        link: `${req.headers.origin}/${id}`,
-        raw: `${req.headers.origin}/raw/${id}`
-    });
 }
