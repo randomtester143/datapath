@@ -4,17 +4,19 @@ async function create() {
 
     const res = await fetch("/api/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json"
+        },
         body: JSON.stringify({ text, stealth })
     });
 
     const data = await res.json();
 
     document.getElementById("result").innerHTML = `
-    <p>browser:</p>
+    <p><b>browser:</b></p>
     <a href="${data.link}" target="_blank">${data.link}</a>
 
-    <p>terminal:</p>
+    <p><b>terminal:</b></p>
     <code>${data.raw}</code>
   `;
 }

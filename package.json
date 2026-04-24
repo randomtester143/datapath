@@ -1,5 +1,6 @@
 {
   "name": "datapath",
+  "type": "module",
   "dependencies": {
     "@upstash/redis": "^1.37.0"
   }
