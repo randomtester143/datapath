@@ -2,29 +2,32 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     const text = document.getElementById('text').value;
     const key = document.getElementById('key').value;
     const customId = document.getElementById('customId').value.trim();
-    const stealth = document.getElementById('stealth').checked;
+    const maxViews = document.getElementById('maxViews').value;
+    const errorBox = document.getElementById('errorBox');
 
-    if (!text) return alert('Input cannot be empty.');
-    if (!key) return alert('Access Key is required.');
-    if (customId && !/^[a-zA-Z0-9]{1,5}$/.test(customId)) return alert('Custom ID must be 1-5 alphanumeric characters.');
+    errorBox.style.display = 'none';
+
+    if (!text) return showError('Input cannot be empty.');
+    if (!key) return showError('Access Key is required.');
+    if (customId && !/^[a-zA-Z0-9]{1,5}$/.test(customId)) return showError('Custom ID must be 1-5 alphanumeric characters.');
 
     try {
         const res = await fetch('/api/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, key, customId, stealth })
+            body: JSON.stringify({ text, key, customId, maxViews })
         });
 
+        const data = await res.json();
+
         if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(errorText);
+            throw new Error(data.error || 'Server error');
         }
 
-        const { id } = await res.json();
         const baseUrl = window.location.origin;
 
-        document.getElementById('browserLink').value = `${baseUrl}/${id}`;
-        document.getElementById('rawLink').value = `${baseUrl}/raw/${id}`;
+        document.getElementById('browserLink').value = `${baseUrl}/${data.id}`;
+        document.getElementById('rawLink').value = `${baseUrl}/raw/${data.id}`;
 
         document.getElementById('links').style.display = 'block';
 
@@ -33,10 +36,15 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
         document.getElementById('key').value = '';
 
     } catch (e) {
-        console.error(e);
-        alert(`Creation failed: ${e.message}`);
+        showError(e.message);
     }
 });
+
+function showError(msg) {
+    const errorBox = document.getElementById('errorBox');
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+}
 
 window.copyToClipboard = function (elementId) {
     const el = document.getElementById(elementId);

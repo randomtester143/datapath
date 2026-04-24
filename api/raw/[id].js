@@ -7,7 +7,7 @@ export default async function handler(req, res) {
 
     const key = req.query.key || req.headers['x-key'];
 
-    // Fetch payload (do not delete yet to prevent unauthenticated data destruction)
+    // Fetch payload
     const data = await redis.get(id);
 
     if (!data) {
@@ -26,9 +26,19 @@ export default async function handler(req, res) {
         return res.status(403).send('Invalid key\n');
     }
 
-    // Key is correct: execute read-once destruction
-    await redis.del(id);
+    // Handle Views Logic
+    const viewsLeftAfterThis = (data.remainingViews || 1) - 1;
+
+    if (viewsLeftAfterThis <= 0) {
+        await redis.del(id);
+    } else {
+        data.remainingViews = viewsLeftAfterThis;
+        await redis.set(id, JSON.stringify(data), { keepttl: true });
+    }
+
+    // Format terminal output
+    const output = `Views remaining: ${viewsLeftAfterThis}\n-------------------\n${data.text}\n`;
 
     res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send(data.text + '\n');
+    res.status(200).send(output);
 }
