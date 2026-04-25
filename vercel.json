@@ -5,15 +5,7 @@
       "destination": "/api/raw/:id"
     },
     {
-      "source": "/app.js",
-      "destination": "/app.js"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/:id",
+      "source": "/:id((?!api/|_next/|.*\\.).*)",
       "destination": "/api/view/:id"
     }
   ]
