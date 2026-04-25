@@ -9,8 +9,28 @@ function escapeHtml(s) {
 }
 
 export default function handler(req, res) {
+  // Security headers. CSP locks the page down to only execute the inline
+  // <script> we ship (allowed via 'unsafe-inline' because the script is
+  // truly inline and we have no third-party scripts). connect-src stays
+  // 'self' so fetch() can hit /api/raw on the same origin.
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Permissions-Policy', 'interest-cohort=(), browsing-topics=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'none'",
+      "script-src 'unsafe-inline'",
+      "style-src 'unsafe-inline'",
+      "connect-src 'self'",
+      "form-action 'self'",
+      "base-uri 'none'",
+      "frame-ancestors 'none'",
+    ].join('; ')
+  );
 
   const { id } = req.query;
   if (!id || typeof id !== 'string') {
@@ -18,8 +38,8 @@ export default function handler(req, res) {
     return res.status(400).send('Bad Request');
   }
 
-  // Defensive — id is interpolated below into a JS string only via JSON.stringify,
-  // and into the page <title> via escapeHtml. Both are safe.
+  // id is interpolated into the page <title> via escapeHtml (HTML-attr safe)
+  // and into the inline JS via JSON.stringify (JS-string safe).
   const safeIdAttr = escapeHtml(id);
   const safeIdJs = JSON.stringify(id);
 
@@ -180,7 +200,6 @@ export default function handler(req, res) {
       }
 
       function renderResult(text) {
-        // Split off the leading "Views remaining: N" status line if present.
         var status = '';
         var body = text;
         var sep = '\\n' + SEPARATOR + '\\n';
@@ -190,7 +209,6 @@ export default function handler(req, res) {
           body = text.slice(idx + sep.length);
         }
 
-        // Build new DOM safely — never inject untrusted content as HTML.
         authBox.classList.add('wide');
         authBox.replaceChildren();
 
@@ -222,22 +240,26 @@ export default function handler(req, res) {
 
       keyForm.addEventListener('submit', async function (e) {
         e.preventDefault();
-        var key = keyInput.value.trim();
+        var key = keyInput.value;
         if (!key) return;
 
         errorMsg.style.display = 'none';
         submitBtn.disabled = true;
 
         try {
-          var res = await fetch('/api/raw/' + encodeURIComponent(ID) + '?key=' + encodeURIComponent(key), {
+          // Send the key in a header, NOT as a query string parameter.
+          // Query strings end up in browser history, server access logs,
+          // and the Referer header. The header doesn't.
+          var res = await fetch('/api/raw/' + encodeURIComponent(ID), {
             cache: 'no-store',
             credentials: 'omit',
+            headers: { 'X-Key': key },
           });
           var text = await res.text();
 
           if (res.ok) {
             renderResult(text);
-            return; // form is gone now
+            return;
           }
 
           showError((text || 'Error').trim());

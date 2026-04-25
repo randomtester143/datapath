@@ -225,6 +225,13 @@
             display: flex;
             gap: 12px;
         }
+
+        .hint {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 6px;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -240,10 +247,10 @@
         </div>
 
         <div class="input-group row">
-            <input type="password" id="key" placeholder="Access Key" style="flex: 2;" autocomplete="off"
-                spellcheck="false">
+            <input type="password" id="key" placeholder="Access Key (min 4 chars)" minlength="4" style="flex: 2;"
+                autocomplete="off" spellcheck="false">
             <input type="text" id="customId" placeholder="Custom ID" maxlength="5" style="flex: 1;" autocomplete="off"
-                spellcheck="false">
+                spellcheck="false" pattern="[a-zA-Z0-9]{1,5}">
         </div>
 
         <div class="slider-group">
@@ -264,6 +271,7 @@
         </div>
 
         <button id="shareBtn" type="button">Protect &amp; Share</button>
+        <div class="hint">Tip: press Cmd/Ctrl+Enter to share.</div>
 
         <div id="links" class="links">
             <div class="link-group">

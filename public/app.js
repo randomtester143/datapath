@@ -46,8 +46,8 @@
 
         var future = new Date(Date.now() + h * 3600 * 1000);
         var opts = { weekday: 'short', hour: 'numeric', minute: '2-digit' };
-        // toLocaleString gives both date and time portions per `opts`.
-        els.expiryPreview.textContent = 'Expires ' + future.toLocaleString(undefined, opts);
+        els.expiryPreview.textContent =
+            'Expires ' + future.toLocaleString(undefined, opts) + ' (your local time)';
     }
 
     els.viewsSlider.addEventListener('input', updateViewsLabel);
@@ -63,13 +63,14 @@
         var text = els.text.value;
         var key = els.key.value;
         var customId = els.customId.value.trim();
-        var maxViews = els.viewsSlider.value;
-        var expiryHours = els.expirySlider.value;
+        var maxViews = parseInt(els.viewsSlider.value, 10) || 1;
+        var expiryHours = parseInt(els.expirySlider.value, 10) || 1;
 
         clearError();
 
         if (!text.trim()) return showError('Input cannot be empty.');
         if (!key) return showError('Access Key is required.');
+        if (key.length < 4) return showError('Access Key must be at least 4 characters.');
         if (customId && !/^[a-zA-Z0-9]{1,5}$/.test(customId)) {
             return showError('Custom ID must be 1-5 alphanumeric characters.');
         }
@@ -83,7 +84,13 @@
             var res = await fetch('/api/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text, key: key, customId: customId, maxViews: maxViews, expiryHours: expiryHours }),
+                body: JSON.stringify({
+                    text: text,
+                    key: key,
+                    customId: customId,
+                    maxViews: maxViews,
+                    expiryHours: expiryHours,
+                }),
                 cache: 'no-store',
                 credentials: 'omit',
             });
@@ -115,7 +122,15 @@
 
     els.shareBtn.addEventListener('click', submit);
 
-    // Copy buttons via event delegation — no inline onclick handlers.
+    // Cmd/Ctrl+Enter from anywhere in the form submits. Plain Enter inside a
+    // textarea should still create a newline, so we only act on the modifier.
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            submit();
+        }
+    });
+
     async function copyFrom(targetId, btn) {
         var input = $(targetId);
         if (!input) return;

@@ -1,108 +1,147 @@
 import { redis } from '../../lib/redis.js';
-import crypto from 'crypto';
+import { verifyAndDecrypt, PAYLOAD_VERSION } from '../../lib/crypto.js';
+import { rateLimit, clientIp } from '../../lib/ratelimit.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Upstash's JS client auto-serializes objects on `set` and parses JSON on `get`,
-// but older records in this project were stored via `JSON.stringify(...)`. To stay
-// compatible with both, normalize whatever `get` returns into a plain object.
-function normalize(raw) {
-    if (raw == null) return null;
-    if (typeof raw === 'string') {
-        try {
-            return JSON.parse(raw);
-        } catch {
-            return null;
-        }
-    }
-    if (typeof raw === 'object') return raw;
+// Load the Lua script once at module load. evalsha + script load on first use
+// would also work but adds complexity for very little win on Upstash REST.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DECREMENT_LUA = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'lib', 'decrement.lua'),
+    'utf8'
+);
+
+const READ_RATE_LIMIT = { limit: 60, windowSeconds: 60 }; // 60 reads / min / IP
+
+function getKey(req) {
+    // Prefer the header — it doesn't end up in browser history or logs.
+    // Fall back to ?key= so existing curl users keep working.
+    const fromHeader = req.headers['x-key'];
+    if (typeof fromHeader === 'string' && fromHeader.length > 0) return fromHeader;
+    const fromQuery = req.query.key;
+    if (typeof fromQuery === 'string' && fromQuery.length > 0) return fromQuery;
     return null;
-}
-
-function timingSafeEqualHex(aHex, bHex) {
-    if (typeof aHex !== 'string' || typeof bHex !== 'string') return false;
-    if (aHex.length !== bHex.length) return false;
-    try {
-        const a = Buffer.from(aHex, 'hex');
-        const b = Buffer.from(bHex, 'hex');
-        if (a.length !== b.length) return false;
-        return crypto.timingSafeEqual(a, b);
-    } catch {
-        return false;
-    }
 }
 
 export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
 
     const { id } = req.query;
     if (!id || typeof id !== 'string') {
         return res.status(400).send('Bad Request\n');
     }
 
-    const key = req.query.key || req.headers['x-key'];
-
-    let raw;
+    // Per-IP rate limit — protects against brute-force key guessing and
+    // ID enumeration. Same-handler limit covers both the GET-key-prompt
+    // path and the actual claim, since both touch this endpoint.
     try {
-        raw = await redis.get(id);
+        const rl = await rateLimit({
+            route: 'raw',
+            identifier: clientIp(req),
+            limit: READ_RATE_LIMIT.limit,
+            windowSeconds: READ_RATE_LIMIT.windowSeconds,
+        });
+        if (!rl.ok) {
+            res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+            return res.status(429).send('Too many requests. Slow down.\n');
+        }
     } catch (err) {
-        console.error('raw get error:', err);
-        return res.status(500).send('Internal server error\n');
+        console.error('raw rate-limit error:', err);
     }
 
-    const data = normalize(raw);
-    if (!data) {
-        return res.status(404).send('Not Found or Already Read\n');
-    }
-
+    const key = getKey(req);
     if (!key) {
+        // Don't claim a view just to ask for the key. The Lua script is the
+        // claim point — we only run it once we have a key to try.
         return res.status(401).send('Enter key:\n');
     }
 
-    const providedHash = crypto
-        .createHash('sha256')
-        .update(String(key))
-        .digest('hex');
-
-    if (!timingSafeEqualHex(providedHash, data.keyHash)) {
-        return res.status(403).send('Invalid key\n');
+    // Atomic claim: GET → decrement → SET-with-preserved-PTTL or DEL, all in
+    // one Redis roundtrip. Eliminates the original GET/TTL/SET race.
+    //
+    // Trade-off discussion (read this before "fixing"):
+    //   The script claims the view BEFORE we verify the access key. This means
+    //   a wrong-key request still consumes a view. The alternative — verify
+    //   first, then claim — reintroduces the race the script exists to prevent.
+    //   We accept the wrong-key-burns-a-view behavior and rate-limit /raw/:id
+    //   to keep abuse cheap.
+    //
+    //   In practice, legitimate users hit the right key on the first try (they
+    //   have it). Attackers who guess keys are exactly who we want to feel the
+    //   cost of a consumed view + a rate-limit hit.
+    let claim;
+    try {
+        claim = await redis.eval(
+            DECREMENT_LUA,
+            [String(id)],
+            [String(PAYLOAD_VERSION)]
+        );
+    } catch (err) {
+        console.error('raw eval error:', err);
+        return res.status(500).send('Internal server error\n');
     }
 
-    const remainingBefore = Number.isFinite(data.remainingViews)
-        ? data.remainingViews
-        : 1;
-    const remainingAfter = remainingBefore - 1;
+    if (!Array.isArray(claim) || claim.length === 0) {
+        // Shouldn't happen — Lua always returns a tagged array.
+        return res.status(500).send('Internal server error\n');
+    }
 
-    // Persist the new view count (or delete) BEFORE returning the content.
-    // Use a pipeline so TTL fetch + write happen back-to-back, narrowing the
-    // window for races with concurrent reads or expiry.
+    const status = claim[0];
+    if (status === 'gone') {
+        return res.status(404).send('Not Found or Already Read\n');
+    }
+    if (status === 'corrupt') {
+        // Either an unsupported old-format record, or stored data we couldn't
+        // parse. Tell the user to regenerate without leaking why.
+        return res.status(410).send('This secret is no longer valid. Please regenerate.\n');
+    }
+    if (status !== 'ok') {
+        return res.status(500).send('Internal server error\n');
+    }
+
+    const remainingAfter = Number(claim[1]) || 0;
+    const payloadJson = claim[2];
+
+    let payload;
     try {
-        if (remainingAfter <= 0) {
-            await redis.del(id);
-        } else {
-            const ttl = await redis.ttl(id);
-            // ttl: -2 => key gone, -1 => no expiry set, >=0 => seconds left.
-            if (ttl === -2) {
-                // Already expired between get and ttl — treat as gone.
-                return res.status(404).send('Not Found or Already Read\n');
-            }
-            const updated = { ...data, remainingViews: remainingAfter };
-            if (ttl > 0) {
-                await redis.set(id, updated, { ex: ttl });
-            } else {
-                // ttl === -1 (shouldn't happen — we always set ex on create — but
-                // guard anyway so we don't accidentally drop the existing TTL).
-                await redis.set(id, updated);
-            }
-        }
+        payload = JSON.parse(payloadJson);
+    } catch {
+        return res.status(500).send('Internal server error\n');
+    }
+
+    // Defense in depth: if the stored expiresAt has passed, refuse even if
+    // Redis somehow still has the record. Should never trip in practice
+    // because TTL handles it, but cheap to enforce.
+    if (typeof payload.expiresAt === 'number' && Date.now() > payload.expiresAt) {
+        // Best-effort cleanup; ignore failure.
+        try { await redis.del(id); } catch { /* ignore */ }
+        return res.status(404).send('Not Found or Already Read\n');
+    }
+
+    // Decrypt and verify the access key. The view has already been claimed.
+    let plaintext;
+    try {
+        plaintext = await verifyAndDecrypt(payload, key);
     } catch (err) {
-        console.error('raw write error:', err);
+        if (err && err.code === 'INVALID_KEY') {
+            return res.status(403).send('Invalid key\n');
+        }
+        if (err && err.code === 'UNSUPPORTED') {
+            return res.status(410).send('This secret is no longer valid. Please regenerate.\n');
+        }
+        console.error('raw decrypt error:', err);
         return res.status(500).send('Internal server error\n');
     }
 
     const output =
         `Views remaining: ${remainingAfter}\n` +
         `-------------------\n` +
-        `${data.text}\n`;
+        `${plaintext}\n`;
 
     return res.status(200).send(output);
 }

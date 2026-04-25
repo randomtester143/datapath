@@ -1,11 +1,13 @@
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
     {
       "source": "/raw/:id",
       "destination": "/api/raw/:id"
     },
     {
-      "source": "/:id((?!api/|_next/|.*\\.).*)",
+      "source": "/:id([a-zA-Z0-9]{1,8})",
       "destination": "/api/view/:id"
     }
   ]
