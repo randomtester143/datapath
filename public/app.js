@@ -1,9 +1,33 @@
+const viewsSlider = document.getElementById("viewsSlider");
+const viewsValue = document.getElementById("viewsValue");
+
+viewsSlider.oninput = () => {
+    const v = parseInt(viewsSlider.value);
+    viewsValue.textContent = v + (v === 1 ? " view" : " views");
+};
+
+const expirySlider = document.getElementById("expirySlider");
+const expiryValue = document.getElementById("expiryValue");
+const expiryPreview = document.getElementById("expiryPreview");
+
+function updateExpiryPreview() {
+    const h = parseInt(expirySlider.value);
+    expiryValue.textContent = h + (h === 1 ? " hour" : " hours");
+
+    const future = new Date(Date.now() + h * 3600 * 1000);
+    const options = { weekday: 'short', hour: 'numeric', minute: '2-digit' };
+    expiryPreview.textContent = "Expires " + future.toLocaleDateString(undefined, options);
+}
+
+expirySlider.oninput = updateExpiryPreview;
+updateExpiryPreview(); // Init on load
+
 document.getElementById('shareBtn').addEventListener('click', async () => {
     const text = document.getElementById('text').value;
     const key = document.getElementById('key').value;
     const customId = document.getElementById('customId').value.trim();
-    const maxViews = document.getElementById('maxViews').value;
-    const expiryHours = document.getElementById('expiryHours').value;
+    const maxViews = viewsSlider.value;
+    const expiryHours = expirySlider.value;
     const errorBox = document.getElementById('errorBox');
 
     errorBox.style.display = 'none';
@@ -11,7 +35,6 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     if (!text) return showError('Input cannot be empty.');
     if (!key) return showError('Access Key is required.');
     if (customId && !/^[a-zA-Z0-9]{1,5}$/.test(customId)) return showError('Custom ID must be 1-5 alphanumeric characters.');
-    if (expiryHours < 1 || expiryHours > 48) return showError('Expiry must be between 1 and 48 hours.');
 
     try {
         const res = await fetch('/api/create', {
@@ -51,4 +74,9 @@ window.copyToClipboard = function (elementId) {
     const el = document.getElementById(elementId);
     el.select();
     document.execCommand('copy');
+
+    const btn = el.nextElementSibling;
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = originalText; }, 1500);
 };

@@ -7,62 +7,110 @@ export default function handler(req, res) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>View Secure Payload</title>
+  <title>Secure Message</title>
   <style>
-    :root { --bg: #f4f4f5; --surface: #ffffff; --text: #18181b; --primary: #000000; --border: #e4e4e7; --error: #d93025; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-      background: var(--bg); 
-      color: var(--text); 
-      margin: 0; 
-      display: flex; 
-      justify-content: center; 
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f7;
+      color: #1c1c1e;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
       align-items: center;
       min-height: 100vh;
-      padding: 1rem;
       box-sizing: border-box;
     }
-    .container { 
-      background: var(--surface); 
-      padding: 2rem; 
-      border-radius: 12px; 
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
-      width: 100%; 
-      max-width: 400px; 
-      box-sizing: border-box; 
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: white;
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+      box-sizing: border-box;
+      transition: max-width 0.3s ease;
     }
-    h2 { margin-top: 0; font-size: 1.5rem; margin-bottom: 1rem; text-align: center; }
-    input, button { 
-      width: 100%; 
-      padding: 12px; 
-      margin-bottom: 12px; 
-      border: 1px solid var(--border); 
-      border-radius: 8px; 
-      box-sizing: border-box; 
-      font-size: 16px; 
+    h2 {
+      margin-top: 0;
+      font-size: 22px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 20px;
     }
-    input { background: #fff; }
-    button { 
-      background: var(--primary); 
-      color: white; 
-      border: none; 
-      font-weight: 600; 
-      cursor: pointer; 
-      transition: opacity 0.2s; 
+    input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid #e5e5ea;
+      background: #fafafa;
+      font-size: 16px;
+      box-sizing: border-box;
+      font-family: inherit;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
     }
-    button:hover { opacity: 0.8; }
-    .error { color: var(--error); font-size: 0.9rem; font-weight: 600; margin-bottom: 1rem; display: none; text-align: center; }
-    pre {
-      background: var(--bg);
-      padding: 1rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
+    input:focus {
+      outline: none;
+      border-color: #007aff;
+      background: #fff;
+    }
+    button {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      background: #000;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    button:hover {
+      opacity: 0.85;
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    .error {
+      color: #ff3b30;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+      text-align: center;
+      background: #ffe5e5;
+      padding: 12px;
+      border-radius: 10px;
+    }
+    .status-text {
+      color: #8e8e93;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .message-box {
+      background: #111;
+      color: #0f0;
+      padding: 20px;
+      border-radius: 14px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
       overflow-x: auto;
       white-space: pre-wrap;
       word-wrap: break-word;
-      font-family: monospace;
-      font-size: 14px;
       margin: 0;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    }
+    .result-view {
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
@@ -109,17 +157,17 @@ export default function handler(req, res) {
           authBox.style.maxWidth = '600px'; 
           
           const parts = text.split('\\n-------------------\\n');
-          let displayHtml = '<h2>Decrypted Content</h2>';
+          let displayHtml = '<div class="result-view"><h2>Decrypted Content</h2>';
           
           if (parts.length > 1) {
-            displayHtml += '<p style="color: #52525b; font-weight: bold; margin-bottom: 1rem; text-align: center;">' + parts[0] + '</p>';
-            displayHtml += '<pre id="output"></pre>';
+            displayHtml += '<div class="status-text">' + parts[0] + '</div>';
+            displayHtml += '<div class="message-box"><pre id="messageText" style="margin:0; font-family:inherit;"></pre></div></div>';
             authBox.innerHTML = displayHtml;
-            document.getElementById('output').textContent = parts.slice(1).join('\\n-------------------\\n').trim();
+            document.getElementById('messageText').textContent = parts.slice(1).join('\\n-------------------\\n').trim();
           } else {
-            displayHtml += '<pre id="output"></pre>';
+            displayHtml += '<div class="message-box"><pre id="messageText" style="margin:0; font-family:inherit;"></pre></div></div>';
             authBox.innerHTML = displayHtml;
-            document.getElementById('output').textContent = text.trim();
+            document.getElementById('messageText').textContent = text.trim();
           }
         } else {
           errorMsg.textContent = text.trim();
