@@ -1,6 +1,5 @@
 import { redis } from '../../lib/redis.js';
 import { verifyAndDecrypt, PAYLOAD_VERSION } from '../../lib/crypto.js';
-import { rateLimit, clientIp } from '../../lib/ratelimit.js';
 
 const DECREMENT_LUA = `
 local raw = redis.call('GET', KEYS[1])
@@ -27,8 +26,6 @@ redis.call('SET', KEYS[1], encoded, 'PX', pttl)
 return { 'ok', remaining, encoded }
 `;
 
-const READ_RATE_LIMIT = { limit: 60, windowSeconds: 60 };
-
 function getKey(req) {
     const fromHeader = req.headers['x-key'];
     if (typeof fromHeader === 'string' && fromHeader.length > 0) return fromHeader;
@@ -45,21 +42,6 @@ export default async function handler(req, res) {
     const { id } = req.query;
     if (!id || typeof id !== 'string') {
         return res.status(400).send('Bad Request\n');
-    }
-
-    try {
-        const rl = await rateLimit({
-            route: 'raw',
-            identifier: clientIp(req),
-            limit: READ_RATE_LIMIT.limit,
-            windowSeconds: READ_RATE_LIMIT.windowSeconds,
-        });
-        if (!rl.ok) {
-            res.setHeader('Retry-After', String(rl.retryAfterSeconds));
-            return res.status(429).send('Too many requests. Slow down.\n');
-        }
-    } catch (err) {
-        console.error('raw rate-limit error:', err);
     }
 
     const key = getKey(req);
