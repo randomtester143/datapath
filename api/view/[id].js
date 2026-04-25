@@ -1,8 +1,8 @@
 export default function handler(req, res) {
-    const { id } = req.query;
-    if (!id) return res.status(400).send('Bad Request');
+  const { id } = req.query;
+  if (!id) return res.status(400).send('Bad Request');
 
-    const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -101,16 +101,26 @@ export default function handler(req, res) {
 
       try {
         const id = window.location.pathname.split("/").pop();
-        const res = await fetch('/raw/' + id + '?key=' + encodeURIComponent(key));
+        const res = await fetch('/api/raw/' + id + '?key=' + encodeURIComponent(key));
         const text = await res.text();
 
         if (res.ok) {
           const authBox = document.getElementById('authBox');
           authBox.style.maxWidth = '600px'; 
           
-          // Replace form with exact terminal output, safely injected
-          authBox.innerHTML = '<h2>Decrypted Content</h2><pre id="output"></pre>';
-          document.getElementById('output').textContent = text.trim();
+          const parts = text.split('\\n-------------------\\n');
+          let displayHtml = '<h2>Decrypted Content</h2>';
+          
+          if (parts.length > 1) {
+            displayHtml += '<p style="color: #52525b; font-weight: bold; margin-bottom: 1rem; text-align: center;">' + parts[0] + '</p>';
+            displayHtml += '<pre id="output"></pre>';
+            authBox.innerHTML = displayHtml;
+            document.getElementById('output').textContent = parts.slice(1).join('\\n-------------------\\n').trim();
+          } else {
+            displayHtml += '<pre id="output"></pre>';
+            authBox.innerHTML = displayHtml;
+            document.getElementById('output').textContent = text.trim();
+          }
         } else {
           errorMsg.textContent = text.trim();
           errorMsg.style.display = 'block';
@@ -126,6 +136,6 @@ export default function handler(req, res) {
 </body>
 </html>`;
 
-    res.setHeader('Content-Type', 'text/html');
-    res.status(200).send(html);
+  res.setHeader('Content-Type', 'text/html');
+  res.status(200).send(html);
 }

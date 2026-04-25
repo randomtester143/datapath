@@ -5,18 +5,21 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
     try {
-        const { text, key, customId, maxViews } = req.body;
+        const { text, key, customId, maxViews, expiryHours } = req.body;
 
         if (!text || !key) {
             return res.status(400).json({ error: 'Missing text or key' });
         }
 
-        // Validate Views
         let views = parseInt(maxViews, 10);
         if (isNaN(views) || views < 1) views = 1;
         if (views > 5) views = 5;
 
-        // Resolve ID
+        let hours = parseInt(expiryHours, 10);
+        if (isNaN(hours) || hours < 1) hours = 1;
+        if (hours > 48) hours = 48;
+        const ttlSeconds = hours * 3600;
+
         let id = customId?.trim();
         if (id) {
             if (id.length > 5 || !/^[a-zA-Z0-9]+$/.test(id)) {
@@ -26,21 +29,21 @@ export default async function handler(req, res) {
             id = crypto.randomBytes(4).toString('hex').slice(0, 6);
         }
 
-        // Hash key server-side
         const keyHash = crypto.createHash('sha256').update(key).digest('hex');
-        const ttl = 3600; // 1 hour TTL standard
+        const expiresAt = Date.now() + ttlSeconds * 1000;
 
         const payload = JSON.stringify({
             text,
             keyHash,
             remainingViews: views,
-            maxViews: views
+            maxViews: views,
+            expiresAt
         });
 
-        const success = await redis.set(id, payload, { nx: true, ex: ttl });
+        const success = await redis.set(id, payload, { nx: true, ex: ttlSeconds });
 
         if (!success) {
-            return res.status(409).json({ error: 'ID already exists. Try another custom ID.' });
+            return res.status(409).json({ error: 'ID already exists' });
         }
 
         res.status(200).json({ id });

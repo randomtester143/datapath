@@ -3,6 +3,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     const key = document.getElementById('key').value;
     const customId = document.getElementById('customId').value.trim();
     const maxViews = document.getElementById('maxViews').value;
+    const expiryHours = document.getElementById('expiryHours').value;
     const errorBox = document.getElementById('errorBox');
 
     errorBox.style.display = 'none';
@@ -10,12 +11,13 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     if (!text) return showError('Input cannot be empty.');
     if (!key) return showError('Access Key is required.');
     if (customId && !/^[a-zA-Z0-9]{1,5}$/.test(customId)) return showError('Custom ID must be 1-5 alphanumeric characters.');
+    if (expiryHours < 1 || expiryHours > 48) return showError('Expiry must be between 1 and 48 hours.');
 
     try {
         const res = await fetch('/api/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, key, customId, maxViews })
+            body: JSON.stringify({ text, key, customId, maxViews, expiryHours })
         });
 
         const data = await res.json();
@@ -31,7 +33,6 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 
         document.getElementById('links').style.display = 'block';
 
-        // Clear sensitive fields
         document.getElementById('text').value = '';
         document.getElementById('key').value = '';
 
