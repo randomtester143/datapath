@@ -82,7 +82,7 @@ export default async function handler(req, res) {
             [String(PAYLOAD_VERSION)]
         );
     } catch (err) {
-        console.error('raw eval error:', err);
+        console.error('raw eval error:', err.message, err.stack);
         return res.status(500).send('Internal server error\n');
     }
 
