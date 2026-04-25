@@ -1,18 +1,30 @@
 import { redis } from '../../lib/redis.js';
 import { verifyAndDecrypt, PAYLOAD_VERSION } from '../../lib/crypto.js';
 import { rateLimit, clientIp } from '../../lib/ratelimit.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Load the Lua script once at module load. evalsha + script load on first use
-// would also work but adds complexity for very little win on Upstash REST.
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DECREMENT_LUA = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'lib', 'decrement.lua'),
-    'utf8'
-);
+const DECREMENT_LUA = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return { 'gone' } end
+local ok, payload = pcall(cjson.decode, raw)
+if not ok or type(payload) ~= 'table' then return { 'corrupt' } end
+if tostring(payload.v) ~= ARGV[1] then return { 'corrupt' } end
+local remaining = tonumber(payload.remainingViews) or 0
+remaining = remaining - 1
+if remaining <= 0 then
+  redis.call('DEL', KEYS[1])
+  payload.remainingViews = 0
+  return { 'ok', 0, cjson.encode(payload) }
+end
+local pttl = redis.call('PTTL', KEYS[1])
+if pttl == -2 then return { 'gone' } end
+if pttl < 0 then
+  redis.call('DEL', KEYS[1])
+  return { 'corrupt' }
+end
+payload.remainingViews = remaining
+local encoded = cjson.encode(payload)
+redis.call('SET', KEYS[1], encoded, 'PX', pttl)
+return { 'ok', remaining, encoded }
+`;
 
 const READ_RATE_LIMIT = { limit: 60, windowSeconds: 60 }; // 60 reads / min / IP
 
